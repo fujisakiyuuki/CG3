@@ -52,12 +52,15 @@ public: // メンバ関数
 	void Draw();
 
 private: // メンバ変数
+	
 	DirectXCommon* dxCommon = nullptr;
 	Input* input = nullptr;
 	DebugText debugText;	
 
 	/// <summary>
 	/// ゲームシーン用
+	Sprite* sprite1 = nullptr;
+	Sprite* sprite2 = nullptr;
 	/// </summary>
 	Sprite* spriteBG = nullptr;
 	Object3d* object3d = nullptr;
