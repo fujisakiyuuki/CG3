@@ -33,8 +33,8 @@ D3D12_VERTEX_BUFFER_VIEW Object3d::vbView{};
 D3D12_INDEX_BUFFER_VIEW Object3d::ibView{};
 Object3d::VertexPosNormalUv Object3d::vertices[vertexCount];
 unsigned short Object3d::indices[indexCount];
-//XMMATRIX Object3d::matBillboard = XMMatrixIdentity();
-//XMMATRIX Object3d::matBillboardY = XMMatrixIdentity();
+XMMATRIX Object3d::matBillboard = XMMatrixIdentity();
+XMMATRIX Object3d::matBillboardY = XMMatrixIdentity();
 void Object3d::StaticInitialize(ID3D12Device * device, int window_width, int window_height)
 {
 	// nullptrチェック
@@ -630,10 +630,13 @@ void Object3d::UpdateViewMatrix()
 	//カメラ回転行列
 	XMMATRIX malCameraRot;
 	//カメラ座標系→ワールド座標系の変換行列
+#pragma region
 	malCameraRot.r[0] = cameraAxisX;
 	malCameraRot.r[1] = cameraAxisY;
 	malCameraRot.r[2] = cameraAxisZ;
 	malCameraRot.r[3] = XMVectorSet(0,0,0,1);
+	
+#pragma endregion
 	//転置により逆行列（逆回転）を計算
 	matView = XMMatrixTranspose(malCameraRot);
 	//視点座標に-1を掛けた座標
@@ -646,7 +649,29 @@ void Object3d::UpdateViewMatrix()
 	XMVECTOR transform = XMVectorSet(tX.m128_f32[0], tY.m128_f32[1], tZ.m128_f32[2], 1.0f);
 	//ビュー行列に平行移動成分を設定
 	matView.r[3] = transform;
+	//ビルボード行列
+	matBillboard.r[0] = cameraAxisX;
+	matBillboard.r[1] = cameraAxisY;
+	matBillboard.r[2] = cameraAxisZ;
+	matBillboard.r[3] = XMVectorSet(0, 0, 0, 1);
+#pragma region Y軸回りビルボード行列の計算
+	//カメラX軸、Y軸、Z軸
+	XMVECTOR ybillCameraAxisX, ybillCamraAxisY, ybillCameraAxisZ;
 
+	//X軸は共通
+	ybillCameraAxisX = cameraAxisX;
+	//Y軸はワールド座標系のY軸
+	ybillCamraAxisY = XMVector3Normalize(upVector);
+	//Z軸はX軸→Y軸の外積で求まる
+	ybillCameraAxisZ = XMVector3Cross(
+		ybillCameraAxisX, ybillCamraAxisY
+	);
+	//Y軸回りビルボード行列
+	matBillboardY.r[0] = ybillCameraAxisX;
+	matBillboardY.r[1] = ybillCamraAxisY;
+	matBillboardY.r[2] = ybillCameraAxisZ;
+	matBillboardY.r[3] = XMVectorSet(0, 0, 0, 1);
+#pragma endregion
 }
 
 bool Object3d::Initialize()
@@ -687,6 +712,13 @@ void Object3d::Update()
 
 	// ワールド行列の合成
 	matWorld = XMMatrixIdentity(); // 変形をリセット
+	matWorld *= matBillboard;
+	matWorld *= matScale; // ワールド行列にスケーリングを反映
+	matWorld *= matRot; // ワールド行列に回転を反映
+	matWorld *= matTrans; // ワールド行列に平行移動を反映
+	// ワールド行列の合成
+	matWorld = XMMatrixIdentity(); // 変形をリセット
+	matWorld *= matBillboardY;
 	matWorld *= matScale; // ワールド行列にスケーリングを反映
 	matWorld *= matRot; // ワールド行列に回転を反映
 	matWorld *= matTrans; // ワールド行列に平行移動を反映
@@ -703,6 +735,7 @@ void Object3d::Update()
 	constMap->color = color;
 	constMap->mat = matWorld * matView * matProjection;	// 行列の合成
 	constBuff->Unmap(0, nullptr);
+
 }
 
 void Object3d::Draw()
